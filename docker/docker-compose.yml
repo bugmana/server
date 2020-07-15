@@ -1,0 +1,112 @@
+#To start the server from this docker-compose file you can run the command "docker-compose up"
+#Configure the location of the configuration file and the data folder
+#The connection to mysql should match the name of the service in this case "mysqldb"
+version: "2.4"
+services:
+  mangosd:
+    container_name: mangosd
+    depends_on: 
+      mysql:
+        condition: service_healthy
+    build:
+      context: ..
+      dockerfile: docker/DockerFile-mangosd
+    ports:
+      - "8085:8085"
+    stdin_open: true
+    tty: true
+    volumes:
+     - ~/mangosone/mangos/etc:/mangos/etc
+     - mangosd_conf:/mangos/etc/mangosd_conf
+     - mangos_bin:/mangos/bin
+     - mysql_socket:/var/run/mysqld
+    networks:  
+      mangos_net:
+        ipv4_address: 10.0.0.4
+  
+  realmd:
+    container_name: realmd
+    depends_on: 
+      mysql:
+        condition: service_healthy
+    build:
+      context: ..
+      dockerfile: docker/DockerFile-realmd
+    ports:
+      - "3724:3724"
+    volumes:
+     - ~/mangosone/mangos/etc:/mangos/etc
+     - realmd_conf:/mangos/etc/realmd_conf
+     - mysql_socket:/var/run/mysqld
+    networks:  
+      mangos_net:
+        ipv4_address: 10.0.0.3
+  
+  mysql:
+    image: mysql:5.6
+    container_name: mysql
+    command: "--default-authentication-plugin=mysql_native_password"
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: MangosDb
+      MYSQL_HOST: localhost
+    volumes:
+     - ~/mangosone/mysql:/var/lib/mysql
+     - mysql_socket:/var/run/mysqld
+    healthcheck:
+      test: ["CMD", "mysqladmin" ,"ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+    networks:
+      mangos_net:
+        ipv4_address: 10.0.0.2
+        
+  db_exec:
+    image: mysql:5.6
+    container_name: db_exec
+    # command: bash -c "set -x; mysql -h$${MYSQL_HOST} -u$${MYSQL_USER} $${MYSQL_DB} -e \"$${MYSQL_CMD}\""
+    command: bash -c "mysql -h$${MYSQL_HOST} -u$${MYSQL_USER} $${MYSQL_DB} -e \"$${MYSQL_CMD}\""
+    environment:
+      MYSQL_USER: mangos
+      MYSQL_PWD: mangos
+      MYSQL_DB: "mangos1"
+      MYSQL_HOST: mysql
+      MYSQL_CMD: "SHOW DATABASES"
+    volumes:
+      - ../../database:/opt/mangos1/database
+    working_dir: /opt/mangos1/database
+    networks:
+      mangos_net:
+        ipv4_address: 10.0.0.5
+    
+
+networks:
+  mangos_net:
+    driver: bridge
+    enable_ipv6: false
+    ipam:
+      driver: default
+      config:
+        - subnet: 10.0.0.0/28
+          gateway: 10.0.0.1
+
+volumes:
+    mangosd_conf:
+        driver: local
+        driver_opts:
+          device: /home/aron/mangosone/mangos/etc/mangosd_conf
+          o: bind
+          type: none
+    realmd_conf:
+        driver: local
+        driver_opts:
+          device: /home/aron/mangosone/mangos/etc/realmd_conf
+          o: bind
+          type: none
+    mangos_bin:
+        driver: local
+        driver_opts:
+          device: /home/aron/mangosone/mangos/bin
+          o: bind
+          type: none
+    mysql_socket:
