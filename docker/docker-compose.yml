@@ -21,8 +21,8 @@ services:
      - mangos_bin:/mangos/bin
      - mysql_socket:/var/run/mysqld
     networks:  
-      mangos_net:
-        ipv4_address: 10.0.0.4
+      mangos_external:
+        ipv4_address: 10.0.0.2
   
   realmd:
     container_name: realmd
@@ -38,10 +38,9 @@ services:
      - ~/mangosone/mangos/etc:/mangos/etc
      - realmd_conf:/mangos/etc/realmd_conf
      - mysql_socket:/var/run/mysqld
-    networks:  
-      mangos_net:
-        ipv4_address: 10.0.0.3
-  
+    networks:
+     mangos_external:
+        ipv4_address: 10.0.0.3  
   mysql:
     image: mysql:5.6
     container_name: mysql
@@ -58,8 +57,7 @@ services:
       timeout: 20s
       retries: 10
     networks:
-      mangos_net:
-        ipv4_address: 10.0.0.2
+      - mangos_internal
         
   db_exec:
     image: mysql:5.6
@@ -74,14 +72,11 @@ services:
       MYSQL_CMD: "SHOW DATABASES"
     volumes:
       - ../../database:/opt/mangos1/database
-    working_dir: /opt/mangos1/database
+    working_dir: /opt/mangos1/database   
     networks:
-      mangos_net:
-        ipv4_address: 10.0.0.5
-    
-
+      - mangos_internal
 networks:
-  mangos_net:
+  mangos_external:
     driver: bridge
     enable_ipv6: false
     ipam:
@@ -89,7 +84,15 @@ networks:
       config:
         - subnet: 10.0.0.0/28
           gateway: 10.0.0.1
-
+  mangos_internal:
+    driver: bridge
+    enable_ipv6: false
+    internal: true
+    ipam:
+      driver: default
+      config:
+       - subnet: 10.1.0.0/28
+         gateway: 10.1.0.1   
 volumes:
     mangosd_conf:
         driver: local
